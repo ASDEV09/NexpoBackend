@@ -27,19 +27,10 @@ const allowedOrigins = [
 ].filter(Boolean);
 
 app.use(cors({
-  origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps, curl, or same-origin)
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin) || process.env.NODE_ENV === "development") {
-      return callback(null, true);
-    } else {
-      // In production, strictly check, but for now allow to avoid setup headaches if user forgets env var
-      // return callback(new Error('Not allowed by CORS'));
-      return callback(null, true);
-    }
-  },
-  methods: "GET,POST,PUT,DELETE,PATCH,OPTIONS",
-  credentials: true
+  origin: true, // This automatically sets Access-Control-Allow-Origin to the request origin
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"]
 }));
 
 app.use(express.json());
