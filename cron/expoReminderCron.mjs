@@ -4,6 +4,10 @@ import Booth from "../models/boothModel.mjs";
 import User from "../models/userModel.mjs";
 import expoMailer from "../utils/expoMailer.mjs";
 import ExpoRegistration from "../models/ExpoRegistration.mjs";
+import ExpoBookmark from "../models/ExpoBookmark.mjs";
+import SessionBookmark from "../models/SessionBookmark.mjs";
+import Session from "../models/sessionModel.mjs";
+import Notification from "../models/notificationModel.mjs";
 
 cron.schedule("0 9 * * *", async () => {
   // ⏰ Roz subah 9 baje
@@ -93,6 +97,96 @@ cron.schedule("0 9 * * *", async () => {
           `
         });
         console.log(`📧 Attendee Reminder sent to ${attendee.email}`);
+      }
+
+      // 5️⃣ BOOKMARKED EXPOS REMINDERS
+      const bookmarks = await ExpoBookmark.find({
+        expoId: expo._id
+      }).populate("attendeeId");
+
+      for (const bm of bookmarks) {
+        const attendee = bm.attendeeId;
+        if (!attendee || !attendee.email) continue;
+
+        // Email
+        await expoMailer({
+          to: attendee.email,
+          subject: `Reminder: Bookmarked Expo '${expo.title}' Starts Tomorrow!`,
+          html: `
+            <h3>Hello ${attendee.name}</h3>
+            <p>The expo you bookmarked is starting <strong>tomorrow</strong>.</p>
+            
+            <h4>Expo Details</h4>
+            <p><strong>Title:</strong> ${expo.title}</p>
+            <p><strong>Location:</strong> ${expo.location}</p>
+            <p><strong>Date:</strong> ${new Date(expo.startDate).toLocaleDateString()}</p>
+            
+            <p>Check it out in the app!</p>
+            <br/>
+            <p>See you there! 🎉</p>
+          `
+        });
+
+        // In-App Notification
+        await Notification.create({
+          recipientId: attendee._id,
+          type: "expo",
+          title: `Reminder: ${expo.title}`,
+          content: `The expo you bookmarked starts tomorrow!`,
+          link: `/attendee/expo/${expo._id}`
+        });
+
+        console.log(`📧 Bookmarked Expo Reminder sent to ${attendee.email}`);
+      }
+    }
+
+    // 6️⃣ SESSION/WORKSHOP REMINDERS
+    const year = tomorrow.getFullYear();
+    const month = String(tomorrow.getMonth() + 1).padStart(2, '0');
+    const day = String(tomorrow.getDate()).padStart(2, '0');
+    const tomorrowStr = `${year}-${month}-${day}`;
+
+    const sessions = await Session.find({
+      date: tomorrowStr
+    });
+
+    for (const session of sessions) {
+      const sessionBookmarks = await SessionBookmark.find({
+        sessionId: session._id
+      }).populate("attendeeId");
+
+      for (const bm of sessionBookmarks) {
+        const attendee = bm.attendeeId;
+        if (!attendee || !attendee.email) continue;
+
+        // Email
+        await expoMailer({
+          to: attendee.email,
+          subject: `Reminder: ${session.type} '${session.title}' is Tomorrow!`,
+          html: `
+            <h3>Hello ${attendee.name}</h3>
+            <p>The ${session.type} you bookmarked is scheduled for <strong>tomorrow</strong>.</p>
+            
+            <h4>Event Details</h4>
+            <p><strong>Title:</strong> ${session.title}</p>
+            <p><strong>Topic:</strong> ${session.topic || "N/A"}</p>
+            <p><strong>Time:</strong> ${session.startTime} - ${session.endTime}</p>
+            <p><strong>Location:</strong> ${session.location || "Online"}</p>
+            
+            <p>Don't miss it!</p>
+          `
+        });
+
+        // In-App Notification
+        await Notification.create({
+          recipientId: attendee._id,
+          type: "message",
+          title: `Reminder: ${session.title}`,
+          content: `The ${session.type} you bookmarked is scheduled for tomorrow at ${session.startTime}.`,
+          link: `/attendee/sessions/${session._id}`
+        });
+
+        console.log(`📧 Session/Workshop Reminder sent to ${attendee.email}`);
       }
     }
 
