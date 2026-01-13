@@ -13,6 +13,7 @@ import {
   updateAttendeeProfile,
   deleteUserDocument,
   getAllUsers,
+  getMe,
 } from "../controllers/authController.mjs";
 import { upload } from "../config/cloudinaryConfigUsers.mjs";
 import auth from "../middleware/middleware.mjs";
@@ -36,7 +37,10 @@ router.post(
   registerFinal
 );
 
+
 router.post("/login", login);
+router.get("/me", auth, getMe);
+
 
 router.get("/exhibitors", auth, isAdmin, getAllExhibitors);
 router.get("/allusers", auth, isAdmin, getAllUsers);
