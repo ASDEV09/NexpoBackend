@@ -174,3 +174,19 @@ export const getBookmarkedSessions = async (req, res) => {
         res.status(500).json({ message: "Failed to fetch bookmarks" });
     }
 };
+
+/* ================= GET MY SESSION REGISTRATIONS ================= */
+export const getMySessionRegistrations = async (req, res) => {
+    try {
+        const attendeeId = req.user.id;
+        // Find all session registrations for this attendee
+        const registrations = await SessionRegistration.find({ attendeeId })
+            .populate("sessionId") // Get full session details
+            .sort({ createdAt: -1 });
+
+        res.json(registrations);
+    } catch (err) {
+        console.error("GET MY SESSION REGISTRATIONS ERROR:", err);
+        res.status(500).json({ message: "Failed to fetch session registrations" });
+    }
+};

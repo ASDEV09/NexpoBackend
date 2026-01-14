@@ -11,7 +11,7 @@ import {
   toggleBookmark,
   getBookmarkedExpos
 } from "../controllers/attendeeExpoController.mjs";
-import { registerSession, checkSessionRegistration, toggleSessionBookmark, getBookmarkedSessions } from "../controllers/attendeeSessionController.mjs";
+import { registerSession, checkSessionRegistration, toggleSessionBookmark, getBookmarkedSessions, getMySessionRegistrations } from "../controllers/attendeeSessionController.mjs";
 import { getNotifications, markAsRead } from "../controllers/notificationController.mjs";
 import isAdmin from "../middleware/isAdmin.mjs";
 
@@ -21,6 +21,7 @@ router.get("/notifications", auth, getNotifications);
 router.post("/notifications/read", auth, markAsRead);
 
 router.get("/my-registrations", auth, getMyRegistrations);
+router.get("/my-sessions", auth, getMySessionRegistrations); // New Route
 router.get("/bookmarks", auth, getBookmarkedExpos);
 router.post("/bookmark/:expoId", auth, toggleBookmark);
 
