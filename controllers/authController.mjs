@@ -244,6 +244,9 @@ export const registerFinal = async (req, res) => {
   if (role === "attendee") {
     user.status = "approved";
     user.isActive = true;
+    if (req.body.interests) {
+      user.interests = req.body.interests;
+    }
   }
 
   if (role === "exhibitor") {
