@@ -54,6 +54,7 @@ export const registerSession = async (req, res) => {
         const registration = await SessionRegistration.create({
             sessionId,
             attendeeId,
+            email: attendee.email, // Added required field
             serial,
             fullName: name || attendee.name,
             phone,
