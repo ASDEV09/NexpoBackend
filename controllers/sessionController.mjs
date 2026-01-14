@@ -229,25 +229,35 @@ export const adminRegisterUser = async (req, res) => {
 
         // Find user by email
         const user = await User.findOne({ email });
-        if (!user) return res.status(404).json({ message: "User not found with this email. Please ask them to sign up first." });
+
+        // Define duplicate check query
+        let duplicateQuery = { sessionId: id };
+        if (user) {
+            duplicateQuery.attendeeId = user._id;
+        } else {
+            duplicateQuery.email = email;
+        }
 
         // Check if already registered
-        const existing = await SessionRegistration.findOne({ sessionId: id, attendeeId: user._id });
-        if (existing) return res.status(400).json({ message: "User is already registered for this session." });
+        const existing = await SessionRegistration.findOne(duplicateQuery);
+        if (existing) return res.status(400).json({ message: "User/Email is already registered for this session." });
 
         const serial = `SES-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
         const registration = await SessionRegistration.create({
             sessionId: id,
-            attendeeId: user._id,
-            fullName: fullName || user.name,
+            attendeeId: user ? user._id : null,
+            email: email,
+            fullName: fullName || (user ? user.name : "Guest"),
             phone: phone || "N/A",
             city: city || "N/A",
             serial
         });
 
-        // Populate immediately for frontend
-        await registration.populate("attendeeId", "email name");
+        // Populate immediately for frontend (only works if attendeeId exists)
+        if (registration.attendeeId) {
+            await registration.populate("attendeeId", "email name");
+        }
 
         // Send Confirmation Email
         const emailMessage = `
@@ -266,16 +276,15 @@ export const adminRegisterUser = async (req, res) => {
 
         try {
             await sendEmail({
-                email: user.email,
+                email: email, // Use the email from body/registration
                 subject: `Registration Confirmed: ${session.title}`,
                 message: emailMessage
             });
         } catch (emailErr) {
             console.error("Failed to send session registration email:", emailErr);
-            // We don't fail the request if email fails, but we log it.
         }
 
-        res.status(201).json({ success: true, message: "User registered manually & email sent.", registration });
+        res.status(201).json({ success: true, message: "Attendee registered manually & email sent.", registration });
 
     } catch (error) {
         res.status(500).json({ error: error.message });
