@@ -1,4 +1,7 @@
 import Session from "../models/sessionModel.mjs";
+import SessionRegistration from "../models/SessionRegistration.mjs";
+import User from "../models/userModel.mjs";
+import sendEmail from "../utils/sendEmail.mjs";
 
 export const createSession = async (req, res) => {
     try {
@@ -201,3 +204,134 @@ export const toggleSessionStatus = async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 };
+
+// Get all registrations for a session
+export const getSessionRegistrations = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const registrations = await SessionRegistration.find({ sessionId: id })
+            .populate("attendeeId", "email name")
+            .sort({ createdAt: -1 });
+        res.status(200).json(registrations);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// Manually register a user (Admin)
+export const adminRegisterUser = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { email, fullName, phone, city } = req.body;
+
+        const session = await Session.findById(id);
+        if (!session) return res.status(404).json({ message: "Session not found" });
+
+        // Find user by email
+        const user = await User.findOne({ email });
+        if (!user) return res.status(404).json({ message: "User not found with this email. Please ask them to sign up first." });
+
+        // Check if already registered
+        const existing = await SessionRegistration.findOne({ sessionId: id, attendeeId: user._id });
+        if (existing) return res.status(400).json({ message: "User is already registered for this session." });
+
+        const serial = `SES-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+        const registration = await SessionRegistration.create({
+            sessionId: id,
+            attendeeId: user._id,
+            fullName: fullName || user.name,
+            phone: phone || "N/A",
+            city: city || "N/A",
+            serial
+        });
+
+        // Populate immediately for frontend
+        await registration.populate("attendeeId", "email name");
+
+        // Send Confirmation Email
+        const emailMessage = `
+            <h3>Session Registration Confirmed!</h3>
+            <p>Hello <b>${registration.fullName}</b>,</p>
+            <p>You have been successfully registered for the session: <b>${session.title}</b>.</p>
+            <div style="background: #f4f4f4; padding: 15px; border-left: 4px solid #10b981; margin: 20px 0;">
+                <p><b>📅 Date:</b> ${new Date(session.date).toLocaleDateString()}</p>
+                <p><b>⏰ Time:</b> ${session.startTime} - ${session.endTime}</p>
+                <p><b>📍 Location:</b> ${session.location}</p>
+                <p><b>🔢 Serial Number:</b> <span style="font-family: monospace; font-size: 1.1em;">${serial}</span></p>
+            </div>
+            <p>Please show this serial number at the entrance.</p>
+            <p>Thank you!</p>
+        `;
+
+        try {
+            await sendEmail({
+                email: user.email,
+                subject: `Registration Confirmed: ${session.title}`,
+                message: emailMessage
+            });
+        } catch (emailErr) {
+            console.error("Failed to send session registration email:", emailErr);
+            // We don't fail the request if email fails, but we log it.
+        }
+
+        res.status(201).json({ success: true, message: "User registered manually & email sent.", registration });
+
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// Update Registration Details (Admin)
+export const updateSessionRegistration = async (req, res) => {
+    try {
+        const { id } = req.params; // Registration ID
+        const { fullName, phone, city, status } = req.body;
+
+        const previousRegistration = await SessionRegistration.findById(id);
+
+        const updatedRegistration = await SessionRegistration.findByIdAndUpdate(
+            id,
+            { fullName, phone, city, status },
+            { new: true }
+        ).populate("attendeeId", "email name").populate("sessionId");
+
+        if (!updatedRegistration) return res.status(404).json({ message: "Registration not found" });
+
+        // If status changed to 'cancelled', send email
+        if (status === 'cancelled' && previousRegistration.status !== 'cancelled') {
+            const emailMessage = `
+                <h3>Session Registration Cancelled</h3>
+                <p>Hello <b>${updatedRegistration.fullName}</b>,</p>
+                <p>Your registration for the session <b>${updatedRegistration.sessionId.title}</b> has been cancelled.</p>
+                <p>If you believe this is a mistake, please contact support.</p>
+            `;
+            try {
+                await sendEmail({
+                    email: updatedRegistration.attendeeId.email,
+                    subject: `Registration Cancelled: ${updatedRegistration.sessionId.title}`,
+                    message: emailMessage
+                });
+            } catch (emailErr) {
+                console.error("Failed to send cancellation email:", emailErr);
+            }
+        }
+
+        res.json({ success: true, message: "Registration updated successfully", registration: updatedRegistration });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// Delete Registration (Admin)
+export const deleteSessionRegistration = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const deleted = await SessionRegistration.findByIdAndDelete(id);
+        if (!deleted) return res.status(404).json({ message: "Registration not found" });
+        res.json({ success: true, message: "Registration deleted successfully" });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+

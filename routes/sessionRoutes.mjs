@@ -5,7 +5,12 @@ import {
     getSessionById,
     updateSession,
     deleteSession,
-    toggleSessionStatus
+    toggleSessionStatus,
+    getSessionRegistrations,
+
+    adminRegisterUser,
+    updateSessionRegistration,
+    deleteSessionRegistration
 } from "../controllers/sessionController.mjs";
 import { upload } from "../config/cloudinaryConfigUser.mjs";
 import auth from "../middleware/middleware.mjs";
@@ -44,5 +49,12 @@ router.put(
 );
 
 router.delete("/:id", auth, isAdmin, deleteSession);
+
+// Registrations (Admin only)
+router.get("/:id/registrations", auth, isAdmin, getSessionRegistrations);
+
+router.post("/:id/register-user", auth, isAdmin, adminRegisterUser);
+router.put("/registrations/:id", auth, isAdmin, updateSessionRegistration); // Update by Registration ID
+router.delete("/registrations/:id", auth, isAdmin, deleteSessionRegistration); // Delete Registration
 
 export default router;
